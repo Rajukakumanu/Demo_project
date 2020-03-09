@@ -1,0 +1,96 @@
+package gov.scot.utilities.common;
+
+import cucumber.api.Scenario;
+import gov.scot.steps.Preconditions;
+import net.serenitybdd.core.environment.ConfiguredEnvironment;
+import net.serenitybdd.core.environment.EnvironmentSpecificConfiguration;
+
+import java.util.Collection;
+
+public class EnvironmentVariables {
+
+    static final String ENVIRONMENT_PROPERTY_NAME = "environment";
+    static final String DYNAMIC_ENVIRONMENT = "dynamic";
+    static final String ENVIRONMENT_TYPE = "environment.type";
+    static final String ENVIRONMENT_NUMBER = "environment.number";
+
+    static final String SPM_PAGE = "spm.page";
+    static final String DOC_PAGE = "doc.page";
+    static final String AEM_PAGE = "aem.page";
+
+    static final String DB_URI = "db.uri";
+    static final String DB_USER = "db.user";
+    static final String DB_PASSWORD = "db.password";
+    static final String DB_SCHEMA = "db.schema";
+    static final String BENEFIT_NAME = "spm.benefitName";
+    public static final String UNIX_SERVER = "unix.server";
+
+    public static String getEnvironmentVariable(String variableName) {
+        String envVariable;
+        envVariable = EnvironmentSpecificConfiguration
+                .from(ConfiguredEnvironment.getEnvironmentVariables())
+                .getProperty(variableName);
+        String environment = ConfiguredEnvironment.getEnvironmentVariables().getProperty(ENVIRONMENT_PROPERTY_NAME);
+        if (DYNAMIC_ENVIRONMENT.contentEquals(environment)) {
+            String environmentType = ConfiguredEnvironment.getEnvironmentVariables().getProperty(ENVIRONMENT_TYPE).toLowerCase();
+            String environmentNumber = ConfiguredEnvironment.getEnvironmentVariables().getProperty(ENVIRONMENT_NUMBER);
+            switch (variableName) {
+                case SPM_PAGE:
+                    envVariable = "https://spmweb." + environmentType + environmentNumber + ".ssdbpp.scotgov-dt.cloud/Curam/logon.jsp";
+                    break;
+                case AEM_PAGE:
+                    if(environmentType.equalsIgnoreCase("dev") && environmentNumber.equalsIgnoreCase("02"))
+                    {
+                        envVariable="https://dev02publish.";
+                    }else{
+                        envVariable="https://aempublish.";
+                    }
+                    Collection<String> tags= Preconditions.scenario.getSourceTagNames();
+                    if(tags.contains("@BSG")) {
+                        System.out.println("tag is BSG");
+                        envVariable = envVariable + environmentType + environmentNumber + ".ssdbpp.scotgov-dt.cloud/beststartgrant#tell_us_why_you_are_applying";
+                    }
+                    else if(tags.contains("@FEA"))
+                    {
+                        System.out.println("tag is FEA");
+                        envVariable = envVariable + environmentType + environmentNumber + ".ssdbpp.scotgov-dt.cloud/funeral-support-payment";
+
+                    }
+                   else if(tags.contains("@YCG"))
+                    {
+                        System.out.println("tag is YCG");
+                        envVariable = envVariable + environmentType + environmentNumber + ".ssdbpp.scotgov-dt.cloud/young-carer-grant";
+
+                    }
+                   else if(tags.contains("@JSP"))
+                    {
+                        System.out.println("tag is JSP");
+                        envVariable = envVariable + environmentType + environmentNumber + ".ssdbpp.scotgov-dt.cloud/job-start-payment#your_eligibility_for_job_start_payment";
+                    }
+                    else if(tags.contains("@SCP"))
+                    {
+                        System.out.println("tag is SCP");
+                        envVariable = envVariable + environmentType + environmentNumber + ".ssdbpp.scotgov-dt.cloud/help-supporting-your-family.html";
+                    }
+
+                    break;
+                case DB_URI:
+                    envVariable = "jdbc:db2://spmdb01."+ environmentType + environmentNumber + ".ssdbpp.scotgov-dt.internal:50000/SPM_LIB1";
+                    break;
+                case DB_USER:
+                    envVariable = "db2i" +environmentType.charAt(0)+environmentNumber;
+                    break;
+                case UNIX_SERVER:
+                    envVariable = "spmapp01." +environmentType+environmentNumber+".ssdbpp.scotgov-dt.internal";
+                    break;
+                case DB_PASSWORD:
+                case DB_SCHEMA:
+                    break;
+            }
+        }
+        return envVariable;
+    }
+
+     void setProperty(String name, String value) {
+    }
+}
