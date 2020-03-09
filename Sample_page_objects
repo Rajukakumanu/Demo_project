@@ -1,0 +1,193 @@
+package gov.scot.pages.spm.Wave2;
+
+import gov.scot.Locators.CDP.CommonLocators;
+import gov.scot.pages.spm.cas.Person.ClientsAndOutcomesPage;
+import gov.scot.pages.spm.fea.ieg.NewApplicationForm;
+import gov.scot.utilities.common.BasePageObject;
+import gov.scot.utilities.common.SharedData;
+import net.serenitybdd.core.Serenity;
+import org.junit.Assert;
+import org.openqa.selenium.By;
+import org.openqa.selenium.TimeoutException;
+import org.openqa.selenium.WebDriverException;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.FindBy;
+import org.openqa.selenium.support.ui.ExpectedCondition;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
+
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.concurrent.TimeUnit;
+
+public class CommonMethods extends BasePageObject implements CommonLocators {
+
+    public SharedData sharedData;
+    private String pageTitle;
+    private ClientsAndOutcomesPage clientsAndOutcomesPage;
+    private NewApplicationForm newApplicationForm;
+
+    public CommonMethods() {
+        //sharedData = getSharedData();
+    }
+
+    @FindBy(xpath = PAGE_TITLE_HEADING)
+    public WebElement pageTitleHeading;
+
+    @FindBy(xpath = SUBMIT_PAGE_TEXT_VAL)
+    public WebElement submitTextVAl;
+
+    @FindBy(xpath = SUBMIT_BUTTON)
+    private WebElement submitButton;
+
+    @FindBy(xpath = ERROR_MESSAGE_VAL)
+    private WebElement errorMessageVal;
+
+    @FindBy(xpath = DECLARATION_ACCEPT_CHECKBOX)
+    public WebElement declarationAcceptCheckbox;
+
+    @FindBy(xpath = DECLARATION_AGREE_CHECKBOX)
+    private WebElement declarationAgreeCheckbox;
+
+    @FindBy(xpath = DECLARATION_CONFIRM_CHECKBOX)
+    private WebElement declarationConfirmCheckbox;
+
+    @FindBy(xpath = FRAME_MODAL_DIALOG)
+    private WebElement frameModelDialog;
+
+    @FindBy(xpath = SELECT_CDP_BENEFIT)
+    private WebElement selectCdpBenefit;
+
+    @FindBy(xpath = NEW_APPLICATION_NEXT)
+    private WebElement newApplicationNext;
+
+    @FindBy(xpath = IEG_MODEL_NEXT_BUTTON)
+    private WebElement iegModelNextButton;
+
+    @FindBy(xpath = PERSON_HOME_NAME)
+    private WebElement personHomeName;
+
+    @FindBy(xpath = PERSON_CONTEXT_PANEL_FRAME)
+    private WebElement personContextPanelFrame;
+
+    @FindBy(xpath = PERSON_HOME_TAB_FRAME)
+    private WebElement personHomeTabFrame;
+
+    @FindBy(xpath = PERSON_CASE_TAB)
+    private WebElement personCaseTab;
+
+    @FindBy(xpath = PERSON_CASE_APPLICATIONS)
+    private WebElement personCaseApplications;
+
+    @FindBy(xpath = VERIFY_APPLICATION)
+    private WebElement verifyApplication;
+
+    @FindBy(xpath = VERIFY_APP_TYPE)
+    private WebElement verifyAppTYpeAsCdp;
+
+
+    public SharedData getSharedData() {
+        sharedData = Serenity.sessionVariableCalled("SharedData");
+        if (sharedData == null) {
+            sharedData = new SharedData();
+            Serenity.setSessionVariable("SharedData").to(sharedData);
+        }
+        return sharedData;
+    }
+
+
+    public void clickIegNextButton() throws InterruptedException {
+        try {
+            waitUntilElementToBeDisplayedAndClickble(iegModelNextButton, 10);
+            click(iegModelNextButton,"iegModelNextButton",10);
+        } catch (NullPointerException | NoSuchElementException h) {
+            throw new AssertionError(h.getMessage());
+        }
+    }
+
+    public String verifyPageTitle(String pageHeader) throws Exception {
+        waitForPageLoaded();
+        waitUntilElementToBeDisplayedAndClickble(pageTitleHeading, 10);
+        pageTitle = pageTitleHeading.getText();
+        System.out.println("The page title displayed as " + pageTitle);
+        try {
+            Assert.assertEquals("Ensure the user is on expected page", pageTitle, pageHeader);
+        } catch (TimeoutException e) {
+            e.printStackTrace();
+        }
+        return pageTitle;
+    }
+
+
+    public void selectChildDisabilityBenefitApplication() throws Exception {
+        waitUntilTheElementIsVisible(selectCdpBenefit);
+        click(selectCdpBenefit, "selectCdpBenefit", 10);
+    }
+
+    public void selectBenefit(String benefitName) throws Exception {
+        switch (benefitName.toLowerCase()) {
+            case "bsg":
+                break;
+            case "cdp":
+                selectChildDisabilityBenefitApplication();
+                newApplicationForm.clickNextButton();
+                break;
+        }
+    }
+
+
+    public void submitIEGApplicationForm() throws Throwable {
+        switchToDefaultFrame();
+        waitUntilTheElementIsVisible(frameModelDialog);
+        WebDriverWait wait = new WebDriverWait(getDriver(), 30, 1000);
+        wait.until(ExpectedConditions.frameToBeAvailableAndSwitchToIt(frameModelDialog));
+        waitUntilTheElementIsVisible(submitTextVAl);
+        waitUntilTheElementIsClickable(submitButton);
+        click(submitButton, "submitButton", 10);
+        try {
+            Assert.fail(errorMessageVal.getText());
+        } catch (WebDriverException e) {
+            Assert.assertTrue(true);
+        }
+    }
+
+    public void fillInDeclarationPage() throws InterruptedException {
+        waitUntilTheElementIsVisible(declarationConfirmCheckbox);
+        click(declarationAcceptCheckbox, "declarationAcceptCheckbox", 10);
+        click(declarationAgreeCheckbox, "declarationAgreeCheckbox", 10);
+        click(declarationConfirmCheckbox, "declarationConfirmCheckbox", 10);
+    }
+
+    public void clickNewApplicationNext() throws Exception {
+        waituntilAllframesloaded();
+        waitForElementToLoad(newApplicationNext, "Next", 10);
+        try {
+            getDriver().manage().timeouts().implicitlyWait(600, TimeUnit.MILLISECONDS);
+            click(newApplicationNext, "newApplicationNext", 10);
+            getDriver().manage().timeouts().implicitlyWait(20000, TimeUnit.MILLISECONDS);
+        } catch (NoSuchElementException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void selectApplicationCaseInSpm(String benefitType) throws Exception {
+        waitForPageLoaded();
+        switchToDefaultFrame();
+        waitUntilTheElementIsVisible(personHomeTabFrame);
+        waitUntilTheFrameIsVisibleAndSwitch(personHomeTabFrame);
+        String personName = personHomeName.getText();
+        System.out.println("thwe person name is " +personName);
+        switchToDefaultFrame();
+        click(personCaseTab,"personCaseTab",10);
+        click(personCaseApplications,"personCaseApplications",10);
+        waitUntilTheFrameIsVisibleAndSwitch(personContextPanelFrame);
+        waitForPageLoaded();
+        waitUntilElementToBeDisplayedAndClickble(verifyApplication,10);
+        Assert.assertTrue("the application case is created ", verifyApplication.isDisplayed());
+        Assert.assertEquals("Verify the application type created as ",verifyAppTYpeAsCdp.getText(),benefitType);
+        click(verifyApplication,"verifyApplication",10);
+
+    }
+}
+
+
