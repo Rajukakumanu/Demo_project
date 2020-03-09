@@ -1,0 +1,512 @@
+package gov.scot.utilities.common;
+
+import com.github.javafaker.Faker;
+import net.serenitybdd.core.pages.PageObject;
+import org.openqa.selenium.NoSuchElementException;
+import org.openqa.selenium.*;
+import org.openqa.selenium.support.ui.*;
+import org.testng.Assert;
+
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Function;
+
+public class BasePageObject extends PageObject {
+
+    public static Map<String, String> TestDataReference = new HashMap<String, String>();
+
+    public static List<String> TestDataValues = new ArrayList<String>();
+    public static String RandomRegisteredUserName;
+    public WebElement CurrentFrame;
+
+    public WebElement getCurrentFrame() {
+        return CurrentFrame;
+    }
+
+    public void setCurrentFrame(WebElement currentFrame) {
+        CurrentFrame = currentFrame;
+    }
+
+
+    public void switchToDefaultFrame() {
+        getDriver().switchTo().defaultContent();
+    }
+
+    public void waitUntilTheElementIsPresent(String xpath) {
+        waitUntilTheElementIsPresent(By.xpath(xpath));
+    }
+
+    public void waitUntilTheElementIsPresent(By by) {
+        WebDriverWait wait = new WebDriverWait(getDriver(), 30, 1000);
+        wait.until(ExpectedConditions.presenceOfElementLocated(by));
+    }
+
+    static void waitUntilTheElementIsVisibleBase(WebElement element, WebDriverWait wait) throws InterruptedException {
+        try {
+            wait.until(ExpectedConditions.visibilityOf(element));
+        } catch (Exception e) {
+            if (e.getMessage().contains("Cannot find context with specified id")) {
+                Thread.sleep(3000);
+                wait.until(ExpectedConditions.visibilityOf(element));
+            }
+        }
+    }
+
+    public void waitUntilTheElementIsVisible(String xpath) throws InterruptedException {
+
+        WebDriverWait wait = new WebDriverWait(getDriver(), 25, 1000);
+        waitUntilTheElementIsVisible(getElementByXpath(xpath));
+    }
+
+    public void waitUntilTheElementIsVisible(WebElement element) throws InterruptedException {
+        // Thread.sleep(3000);
+        WebDriverWait wait = new WebDriverWait(getDriver(), 25, 1000);
+        waitUntilTheElementIsVisibleBase(element, wait);
+    }
+
+    public void waitUntilTheElementIsVisibleShortWait(WebElement element) throws InterruptedException {
+        // Thread.sleep(3000);
+        WebDriverWait wait = new WebDriverWait(getDriver(), 5, 1000);
+        waitUntilTheElementIsVisibleBase(element, wait);
+    }
+
+    public void waitUntilAsyncWebelementIsVisible(String xpath) {
+        Wait<WebDriver> wait = new FluentWait<WebDriver>(getDriver()).pollingEvery(Duration.ofSeconds(5)).withTimeout(Duration.ofSeconds(60)).ignoring(WebDriverException.class);
+        wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath(xpath)));
+    }
+
+    public void waitUntilAsyncWebelementIsNotVisible(String xpath) {
+        Wait<WebDriver> wait = new FluentWait<WebDriver>(getDriver()).pollingEvery(Duration.ofSeconds(5)).withTimeout(Duration.ofSeconds(60)).ignoring(WebDriverException.class);
+        wait.until(ExpectedConditions.invisibilityOfElementLocated(By.xpath(xpath)));
+    }
+
+    public void waitUntilTextIsPresent(String text) {
+        Wait<WebDriver> wait = new FluentWait<WebDriver>(getDriver()).pollingEvery(Duration.ofSeconds(5)).withTimeout(Duration.ofSeconds(60)).ignoring(WebDriverException.class);
+        String xpath = "(//*[contains(text(),'%s')])[1]";
+        xpath = String.format(xpath, text);
+        // wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath(xpath)));
+        wait.until(ExpectedConditions.textToBePresentInElementLocated(By.xpath(xpath), text));
+
+    }
+
+    public void waitForPageLoaded() {
+        ExpectedCondition<Boolean> expectation = new ExpectedCondition<Boolean>() {
+            public Boolean apply(WebDriver driver) {
+                return ((JavascriptExecutor) driver).executeScript("return document.readyState").toString()
+                        .equals("complete");
+            }
+        };
+        try {
+            Thread.sleep(1000);
+            WebDriverWait wait = new WebDriverWait(getDriver(), 30);
+            wait.until(expectation);
+        } catch (Throwable error) {
+            Assert.fail("Timeout waiting for Page Load Request to complete.");
+        }
+    }
+
+    public void waituntilAllframesloaded() throws Exception {
+        final List<WebElement> iframes = getDriver().findElements(By.tagName("iframe"));
+        for (WebElement iframe : iframes) {
+            waitUntilTheFrameIsVisibleAndSwitch(iframe);
+            waitUntilTheElementIsVisible("//body");
+            waitForPageLoaded();
+            switchToDefaultFrame();
+        }
+    }
+
+    public boolean verifyTextPresentByXpath(WebElement element, String text) throws Exception {
+        try {
+            String sText = element.getText();
+            if (sText.contains(text)) {
+                return true;
+            } else {
+                return false;
+            }
+        } catch (Exception e) {
+            throw new Exception("Unknown exception occured while verifying the title FAIL");
+        }
+    }
+
+    public boolean verifyTextPresentInElements(String xpath, String text) throws Exception {
+        try {
+            List<WebElement> AllElemnts = getDriver().findElements(By.xpath(xpath));
+            for (WebElement element : AllElemnts) {
+                if (element.getText().equalsIgnoreCase(text)) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (Exception e) {
+            throw new Exception("Unknown exception occured while verifying the title FAIL");
+        }
+    }
+
+    public boolean isTextPresent(String str) throws InterruptedException {
+        Thread.sleep(2000);
+        WebElement bodyElement = getDriver().findElement(By.tagName("body"));
+        return bodyElement.getText().contains(str);
+    }
+
+    public boolean isElementPresent(String str) {
+        Boolean isPresent = getDriver().findElements(By.xpath(str)).size() > 0;
+        return isPresent;
+    }
+
+    public WebElement getFluentElement(final String xpath) {
+        // First - set the wait parameters
+        Wait<WebDriver> wait = new FluentWait<WebDriver>(getDriver()).pollingEvery(Duration.ofSeconds(5)).withTimeout(Duration.ofSeconds(30)).ignoring(WebDriverException.class);
+        // set the interval between every 2 tries
+        // .ignoring(NoSuchElementException.class); // don't throw this exception
+        // Then - declare the webElement and use a function to find it
+        WebElement waitingElement = wait.until(new Function<WebDriver, WebElement>() {
+
+            public WebElement apply(WebDriver driver) {
+                return driver.findElement(By.xpath(xpath));
+            }
+        });
+        return waitingElement;
+    }
+
+    public WebElement getElementByXpath(String xpath) throws InterruptedException {
+        return getDriver().findElement(By.xpath(xpath));
+    }
+
+    public void waitUntilTheElementIsNotVisible(String xpath) {
+        WebDriverWait wait = new WebDriverWait(getDriver(), 30, 1000);
+        wait.until(ExpectedConditions.invisibilityOfElementLocated(By.xpath(xpath)));
+    }
+
+    public void waitUntilTheElementIsNotVisible(WebElement obObjec) {
+        WebDriverWait wait = new WebDriverWait(getDriver(), 45, 1000);
+        wait.until(ExpectedConditions.invisibilityOf(obObjec));
+    }
+
+    public void waitUntilTheElementIsClickable(String xpath) {
+        WebDriverWait wait = new WebDriverWait(getDriver(), 30, 1000);
+        wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
+    }
+
+    public void waitUntilTextIsPresent(WebElement element, String text) {
+        WebDriverWait wait = new WebDriverWait(getDriver(), 30, 1000);
+        wait.until(ExpectedConditions.textToBePresentInElement(element, text));
+    }
+
+    public void waitUntilTheElementIsClickable(WebElement element) {
+        WebDriverWait wait = new WebDriverWait(getDriver(), 30, 1000);
+        wait.until(ExpectedConditions.elementToBeClickable(element));
+    }
+
+    public void waitUntilTheFrameIsVisibleAndSwitch(WebElement element) throws Exception {
+        try {
+            WebDriverWait wait = new WebDriverWait(getDriver(), 45, 5000);
+            wait.until(ExpectedConditions.frameToBeAvailableAndSwitchToIt(element));
+            setCurrentFrame(element);
+        } catch (Exception e) {
+            throw new Exception("Unable to find the frame" + e.getMessage());
+        }
+    }
+
+    public void waitUntilTheFrameIsVisibleAndSwitch(String xpath) throws Exception {
+        try {
+            WebDriverWait wait = new WebDriverWait(getDriver(), 30, 1000);
+            wait.until(ExpectedConditions.frameToBeAvailableAndSwitchToIt(By.xpath(xpath)));
+            // setCurrentFrame(element);
+        } catch (Exception e) {
+            throw new Exception("Unable to find the frame   :" + e.getMessage());
+        }
+    }
+
+    /*
+     * try { WebDriverWait wait12 = new WebDriverWait(getDriver(),120,1000);
+     * wait12.until(ExpectedConditions.frameToBeAvailableAndSwitchToIt(By.
+     * xpath("//iframe[contains(@title,'Context Panel - ')]"))); } catch(Exception
+     * e) {
+     *
+     * }
+     */
+
+    public void selectVisibileTextByXPath(String xpath, String value) throws Exception {
+        try {
+            new Select(getDriver().findElement(By.xpath(xpath))).selectByVisibleText(value);
+            ;
+            System.out.println("The element with xpath: " + xpath + " is selected with value :" + value);
+        } catch (Exception e) {
+            throw new Exception("The value: " + value + " could not be selected");
+        }
+    }
+
+    public WebElement getWebElementLinkbyText(String lnkText) throws Exception {
+
+        /*
+         * System.out.println(getCurrentFrame().getAttribute("id"));
+         * waitUntilTheFrameIsVisibleAndSwitch(getCurrentFrame());
+         */
+
+        List<WebElement> allinframes = getDriver().findElements(By.tagName("a"));
+
+
+        for (WebElement ele2 : allinframes) {
+
+            System.out.println(ele2.getText());
+            if (lnkText.equalsIgnoreCase("Save")) {
+                if (ele2.getText().equals(lnkText))
+                    return ele2;
+            }
+
+            if (ele2.getText().contains(lnkText)) {
+                return ele2;
+            }
+        }
+        throw new Exception(" Unable to find the element with the specified text");
+
+    }
+
+    protected void RefreshIFrameByJavaScriptExecutor(String iFrameName) {
+        String script = String.format("document.getElementById('%s').src = document.getElementById('%s').src");
+        ((JavascriptExecutor) getDriver()).executeScript(script, iFrameName);
+    }
+
+    public void switchFrameAndClickLink(String lnkToClick) {
+
+        List<WebElement> allIFrames = getDriver().findElements(By.tagName("iframe"));
+
+        for (WebElement iFrame : allIFrames) {
+            System.out.println(iFrame.getAttribute("title"));
+            getDriver().switchTo().frame(iFrame);
+            List<WebElement> allLinksinFrame = getDriver().findElements(By.tagName("a"));
+            boolean founFlag = false;
+            for (WebElement link : allLinksinFrame) {
+                System.out.println(link.getText());
+                if (link.getText().contains("Register a Person")) {
+                    founFlag = true;
+                    link.click();
+                    break;
+                }
+            }
+
+            if (founFlag)
+                break;
+
+        }
+
+    }
+
+    public String currentDateTime() {
+        DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+        Calendar cal = Calendar.getInstance();
+        String cal1 = dateFormat.format(cal.getTime());
+        return cal1;
+    }
+
+    public String currentDate() {
+        DateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy");
+        Calendar cal = Calendar.getInstance();
+        String cal1 = dateFormat.format(cal.getTime());
+        return cal1;
+    }
+
+    public static String RandomDate(String daterange) {
+        DateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy");
+        //SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+        Calendar currentDateBefore = Calendar.getInstance();
+        currentDateBefore.add(Calendar.YEAR, -Integer.parseInt(daterange));
+        String cal1 = dateFormat.format(currentDateBefore.getTime());
+        return cal1;
+    }
+
+    public static String RandomDateInbetween(String datefrom, String dateto) throws Exception {
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+        //SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        Date fromdate = sdf.parse(datefrom);
+        Date Todate = sdf.parse(dateto);
+        Faker faker = new Faker();
+        Date dateofBirthBaby = faker.date().between(fromdate, Todate);
+        return sdf.format(dateofBirthBaby);
+    }
+
+    public static String getRandomNino() {
+        int randomSixDigits = ThreadLocalRandom.current().nextInt(100000, 900000);
+        //AT & D stand for Automation Test Data :)
+        String randomNino = "AT" + randomSixDigits + "D";
+        return randomNino;
+    }
+
+    public static String getRandomPostCode() {
+        String[] postcodes = {"EH3 7AA", "EH30 9PT", "EH13 0LS", "EH5 1JF", "EH9 1UL", "EH11 3ES", "EH9 3AQ", "EH3 7LJ", "EH10 5HX",
+                "EH7 6HW", "G13 3AE", "G40 2DL", "G42 8UF", "G33 2JZ", "G11 7LP", "G33 2LL", "G33 3BY", "G20 0EX",
+                "G32 9BE", "AB16 7GN", "AB12 3JQ", "AB22 8FG", "AB25 2BU", "AB12 3JS", "AB11 6JZ", "AB24 5EH"};
+
+        String randomPostcode = postcodes[new Random().nextInt(postcodes.length)];
+        System.out.println("Random Postcode selected = " + randomPostcode);
+        return randomPostcode;
+    }
+
+    public String weeksToDateConverter(String weeks) {
+        int noOfweeks = Integer.parseInt(weeks);
+        int noOfDays = noOfweeks * 7;
+        DateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy");
+        Calendar currentDate = Calendar.getInstance();
+        currentDate.add(Calendar.DAY_OF_YEAR, noOfDays);
+        String datevalue = dateFormat.format(currentDate.getTime());
+        System.out.println("No of weeks : " + weeks + " Date value to enter is " + datevalue);
+        return datevalue;
+    }
+
+    public String ReturnDate(int months, int weeks, int days) {
+        int noOfDays = weeks * 7;
+        noOfDays = noOfDays + days;
+        DateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy");
+        Calendar currentDate = Calendar.getInstance();
+        currentDate.add(Calendar.MONTH, months);
+        currentDate.add(Calendar.DAY_OF_YEAR, noOfDays);
+        String datevalue = dateFormat.format(currentDate.getTime());
+        return datevalue;
+    }
+
+    public String ReturnDateMinus(int months, int weeks, int days) {
+        int noOfDays = weeks * 7;
+        noOfDays = noOfDays + days;
+        DateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy");
+        Calendar currentDate = Calendar.getInstance();
+        currentDate.add(Calendar.MONTH, -months);
+        currentDate.add(Calendar.DAY_OF_YEAR, noOfDays);
+        String datevalue = dateFormat.format(currentDate.getTime());
+        return datevalue;
+    }
+
+    public void scrollElementIntoView(WebElement objElem) {
+        try {
+            JavascriptExecutor objJS = (JavascriptExecutor) getDriver();
+            objJS.executeScript("arguments[0].scrollIntoView();", objElem);
+        } catch (NoSuchElementException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Returns first selected option from a dropdown
+     * author Raju kakumanu
+     *
+     * @param dropDownElement
+     * @return
+     */
+    public String getFirstSelectedOption(WebElement dropDownElement) {
+        Select dropdown = new Select(dropDownElement);
+        String firstOption = dropdown.getFirstSelectedOption().getText();
+        return firstOption;
+    }
+
+    /**
+     * Enters key input in text box
+     *
+     * @param element
+     * @param sElementName
+     * @param sInputValue
+     */
+    public void enterKeys(WebElement element, String sElementName,
+                          String sInputValue, int time) {
+        try {
+            waitForElementToLoad(element, sElementName, 10);
+            element.clear();
+            element.sendKeys(sInputValue);
+        } catch (StaleElementReferenceException e) {
+            Assert.fail("Element " + sElementName
+                    + " is not attached to the page document");
+        } catch (NoSuchElementException e) {
+
+            Assert.fail("Element " + sElementName + " was not found in DOM");
+        } catch (Exception e) {
+
+            Assert.fail("Some Exception occured while clicking on "
+                    + sElementName);
+        }
+    }
+
+    /**
+     * Enters key input in text box
+     *
+     * @param element
+     * @param sElementName
+     */
+    public void click(WebElement element, String sElementName
+            , int time) {
+        try {
+            waitForElementToLoad(element, sElementName, 10);
+            element.click();
+        } catch (StaleElementReferenceException e) {
+            Assert.fail("Element " + sElementName
+                    + " is not attached to the page document");
+        } catch (NoSuchElementException e) {
+
+            Assert.fail("Element " + sElementName + " was not found in DOM");
+        } catch (Exception e) {
+
+            Assert.fail("Some Exception occured while clicking on "
+                    + sElementName);
+        }
+    }
+
+
+    /**
+     * Web driver waits for visibility of specified web element for the amount
+     * of time specified.
+     *
+     * @param element
+     * @param sElementName
+     * @param waitTime
+     * @return true or false
+     */
+    public boolean waitForElementToLoad(WebElement element,
+                                        String sElementName, int waitTime) {
+        try {
+            WebDriverWait wait = new WebDriverWait(getDriver(), waitTime);
+            wait.until(ExpectedConditions.visibilityOf(element));
+        } catch (TimeoutException e) {
+            Assert.fail("Element " + sElementName
+                    + " was not visible in time - " + waitTime);
+            return false;
+        } catch (NoSuchElementException e) {
+            Assert.fail("Element " + element
+                    + "is not attached to the page document");
+            return false;
+        } catch (Exception e) {
+            Assert.fail("Unable to find the element " + sElementName);
+            return false;
+        }
+        return true;
+    }
+
+
+    /**
+     * Returns true if the web element is present and enabled on webpage
+     *
+     * @param waitTime
+     * @return
+     */
+    public boolean waitUntilElementToBeDisplayedAndClickble(WebElement element,
+                                                             int waitTime){
+
+            boolean bFlag = false;
+            try {
+                WebDriverWait wait = new WebDriverWait(getDriver(), waitTime);
+                wait.until(ExpectedConditions.elementToBeClickable(element));
+                if (element.isDisplayed() && element.isEnabled()) {
+                    bFlag = true;
+                }
+            } catch (NoSuchElementException e) {
+               e.getStackTrace();
+            } catch (TimeoutException e) {
+                e.getStackTrace();
+            } catch (Exception e) {
+                e.getStackTrace();
+                Assert.fail("Element " + element + " is not displayed");
+            }
+            return bFlag;
+
+    }
+
+}
